@@ -47,12 +47,10 @@
         // Thumbnail animation value
         this.left = 0;
 
-        this.init();
-
         return this;
     };
 
-    Thumbnail.prototype.init = function() {
+    Thumbnail.prototype.setup = function() {
         var _this = this;
         if (this.core.s.thumbnail && this.core.$items.length > 1) {
             if (this.core.s.showThumbByDefault) {
@@ -87,24 +85,11 @@
 
     Thumbnail.prototype.build = function() {
         var _this = this;
-        var thumbList = '';
-        var vimeoErrorThumbSize = '';
         var $thumb;
         var html = '<div class="lg-thumb-outer">' +
             '<div class="lg-thumb group">' +
             '</div>' +
             '</div>';
-
-        switch (this.core.s.vimeoThumbSize) {
-            case 'thumbnail_large':
-                vimeoErrorThumbSize = '640';
-                break;
-            case 'thumbnail_medium':
-                vimeoErrorThumbSize = '200x150';
-                break;
-            case 'thumbnail_small':
-                vimeoErrorThumbSize = '100x75';
-        }
 
         _this.core.$outer.addClass('lg-has-thumb');
 
@@ -124,57 +109,35 @@
             _this.$thumbOuter.css('height', _this.core.s.thumbContHeight + 'px');
         }
 
-        function getThumb(src, thumb, index) {
-            var isVideo = _this.core.isVideo(src, index) || {};
-            var thumbImg;
-            var vimeoId = '';
-
-            if (isVideo.youtube || isVideo.vimeo || isVideo.dailymotion) {
-                if (isVideo.youtube) {
-                    if (_this.core.s.loadYoutubeThumbnail) {
-                        thumbImg = '//img.youtube.com/vi/' + isVideo.youtube[1] + '/' + _this.core.s.youtubeThumbSize + '.jpg';
-                    } else {
-                        thumbImg = thumb;
-                    }
-                } else if (isVideo.vimeo) {
-                    if (_this.core.s.loadVimeoThumbnail) {
-                        thumbImg = '//i.vimeocdn.com/video/error_' + vimeoErrorThumbSize + '.jpg';
-                        vimeoId = isVideo.vimeo[1];
-                    } else {
-                        thumbImg = thumb;
-                    }
-                } else if (isVideo.dailymotion) {
-                    if (_this.core.s.loadDailymotionThumbnail) {
-                        thumbImg = '//www.dailymotion.com/thumbnail/video/' + isVideo.dailymotion[1];
-                    } else {
-                        thumbImg = thumb;
-                    }
-                }
-            } else {
-                thumbImg = thumb;
-            }
-
-            thumbList += '<div data-vimeo-id="' + vimeoId + '" class="lg-thumb-item" style="width:' + _this.core.s.thumbWidth + 'px; margin-right: ' + _this.core.s.thumbMargin + 'px"><img src="' + thumbImg + '" /></div>';
-            vimeoId = '';
-        }
+        var defaultThumbImg = '';
+        var $thumbs = _this.core.$outer.find('.lg-thumb'),
+            slideLength;
 
         if (_this.core.s.dynamic) {
-            for (var i = 0; i < _this.core.s.dynamicEl.length; i++) {
-                getThumb(_this.core.s.dynamicEl[i].src, _this.core.s.dynamicEl[i].thumb, i);
-            }
+            slideLength = _this.core.s.dynamicEl.length;
         } else {
-            _this.core.$items.each(function(i) {
-
-                if (!_this.core.s.exThumbImage) {
-                    getThumb($(this).attr('href') || $(this).attr('data-src'), $(this).find('img').attr('src'), i);
-                } else {
-                    getThumb($(this).attr('href') || $(this).attr('data-src'), $(this).attr(_this.core.s.exThumbImage), i);
-                }
-
-            });
+            slideLength = _this.core.$items.length;
         }
+        // Create all thumbnail elements and ask the handlers to load the thumbnails
+        for (var i = 0; i < slideLength; i++) {
+            var $thumb = $('<div class="lg-thumb-item" style="width:' + _this.core.s.thumbWidth + 'px; margin-right: ' + _this.core.s.thumbMargin + 'px"><img src="' + defaultThumbImg + '" /></div>');
+            $thumbs.append($thumb);
+            var handler = _this.core.$slide.eq(i).data('handler'),
+                thumbPromise = $.Deferred();
 
-        _this.core.$outer.find('.lg-thumb').html(thumbList);
+            function setupThumb($thumb) {
+                thumbPromise.done(function (thumbImg) {
+                    if (thumbImg) {
+                        $thumb.find('img').attr('src', thumbImg);
+                    }
+                }).fail(function () {
+                    $thumb.addClass('lg-thumb-failed');
+                })
+            }
+            setupThumb($thumb);
+
+            handler.thumbnail(thumbPromise);
+        }
 
         $thumb = _this.core.$outer.find('.lg-thumb-item');
 
